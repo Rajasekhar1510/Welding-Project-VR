@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/test scenes/start SCENE.unity
+    guid: cbec05a4353de6448a42e5d057866732
+  - enabled: 1
+    path: Assets/Scenes/test scenes/grab objects and place SCENE.unity
+    guid: 5eef8a9bc79bcd54d91d32441487f8e1
+  - enabled: 1
+    path: Assets/Scenes/test scenes/MAIN SCENE.unity
+    guid: 491badfc1e240a5488b0a6878279d588
+  m_configObjects:
+    com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: b2676173ddb623b4381b0f28b5e11023, type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: cfd72dba69e8c6540bc3a611fe41501d, type: 2}
+  m_UseUCBPForAssetBundles: 0
