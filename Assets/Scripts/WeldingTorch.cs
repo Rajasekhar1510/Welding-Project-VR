@@ -4,6 +4,9 @@ using Oculus.Interaction;
 
 public class WeldingTorch : MonoBehaviour
 {
+    [Header("Seam Check System")]
+    [SerializeField] private WeldSeamEvaluator seamEvaluator;
+
     [Header("Button Input Settings")]
     [SerializeField] private bool checkControllerButtonWhileGrabbed = true;
     [SerializeField] private OVRInput.Button activateButton = OVRInput.Button.PrimaryIndexTrigger | OVRInput.Button.SecondaryIndexTrigger;
@@ -15,13 +18,16 @@ public class WeldingTorch : MonoBehaviour
     [SerializeField] private AudioSource weldingAudio;
     [SerializeField] private Light torchGlowLight;
 
-    [Header("Weld Blob Settings (From unity_welding_simulator)")]
+    [Header("Weld Blob Settings")]
     [SerializeField] private GameObject weldBlobPrefab;
     [SerializeField] private LayerMask weldableLayer;
-    [SerializeField] private float maxWeldDistance = 0.08f; // 8 cm reach from nozzle tip
-    [SerializeField] private float blobSpawnInterval = 0.1f;
-    [SerializeField] private float minBlobDistance = 0.005f; // Prevents infinite stacking in one spot
-    [SerializeField] private float heatRatePerSecond = 1.0f;
+    [SerializeField] private float maxWeldDistance = 0.08f;
+    [SerializeField] private float blobSpawnInterval = 0.06f;
+    [SerializeField] private float minBlobDistance = 0.004f;
+
+    [Header("Blob Size & Orientation Fix")]
+    [SerializeField] private Vector3 blobWorldScale = new Vector3(0.015f, 0.015f, 0.015f);
+    [SerializeField] private Vector3 blobRotationOffset = Vector3.zero;
 
     private bool isGrabbed = false;
     private bool isButtonPressed = false;
@@ -101,7 +107,8 @@ public class WeldingTorch : MonoBehaviour
 
     private void EvaluateTorchState()
     {
-        bool shouldLightUp = isGrabbed && isButtonPressed;
+        bool canWeld = seamEvaluator == null || !seamEvaluator.IsFinishedOrDamaged;
+        bool shouldLightUp = isGrabbed && isButtonPressed && canWeld;
 
         if (shouldLightUp && weldRoutine == null)
         {
@@ -132,6 +139,11 @@ public class WeldingTorch : MonoBehaviour
             StopCoroutine(weldRoutine);
             weldRoutine = null;
         }
+
+        if (seamEvaluator != null)
+        {
+            seamEvaluator.OnTorchStoppedWelding();
+        }
     }
 
     private IEnumerator WeldAndSpawnBlobsLoop()
@@ -140,23 +152,39 @@ public class WeldingTorch : MonoBehaviour
 
         while (true)
         {
-            // Only spawns a blob if the raycast hits a Collider on the weldableLayer
-            if (nozzleTip != null &&
-                Physics.Raycast(nozzleTip.position, nozzleTip.forward, out RaycastHit hit, maxWeldDistance, weldableLayer))
+            if (seamEvaluator != null && seamEvaluator.IsFinishedOrDamaged)
             {
-                // 1. Spawn the visual metal blob on the mesh surface
+                StopWelding();
+                yield break;
+            }
+
+            if (nozzleTip != null &&
+                Physics.Raycast(
+                    nozzleTip.position,
+                    nozzleTip.forward,
+                    out RaycastHit hit,
+                    maxWeldDistance,
+                    weldableLayer,
+                    QueryTriggerInteraction.Collide))
+            {
+                GameObject blob = null; // <-- CHANGE 1: Declared outside the 'if' block
+
+                // 1. Spawn the visual blob if the torch moved at least minBlobDistance
                 if (weldBlobPrefab != null && Vector3.Distance(hit.point, lastBlobSpawnPoint) >= minBlobDistance)
                 {
                     lastBlobSpawnPoint = hit.point;
 
-                    GameObject blob = Instantiate(
-                        weldBlobPrefab,
-                        hit.point,
-                        Quaternion.LookRotation(hit.normal)
-                    );
+                    Quaternion surfaceRot = Quaternion.FromToRotation(Vector3.up, hit.normal) * Quaternion.Euler(blobRotationOffset);
+                    blob = Instantiate(weldBlobPrefab, hit.point, surfaceRot);
 
-                    // Parent to the hit mesh so the blob stays attached when grabbed in VR
                     blob.transform.SetParent(hit.transform, true);
+
+                    Vector3 parentScale = hit.transform.lossyScale;
+                    blob.transform.localScale = new Vector3(
+                        blobWorldScale.x / Mathf.Max(0.0001f, Mathf.Abs(parentScale.x)),
+                        blobWorldScale.y / Mathf.Max(0.0001f, Mathf.Abs(parentScale.y)),
+                        blobWorldScale.z / Mathf.Max(0.0001f, Mathf.Abs(parentScale.z))
+                    );
 
                     if (blob.TryGetComponent<WeldingBlobSet>(out var blobScript))
                     {
@@ -164,11 +192,12 @@ public class WeldingTorch : MonoBehaviour
                     }
                 }
 
-                // 2. Apply weld heat to attach two touching WeldablePart objects together
-               /* if (hit.collider.TryGetComponent<WeldablePart>(out var part))
+                // 2. Pass hit.normal, hit.transform, and blob so the hole spawns flat and clears blobs
+                if (seamEvaluator != null)
                 {
-                    part.ApplyWeldHeat(heatRatePerSecond * blobSpawnInterval, hit.point);
-                }*/
+                    // <-- CHANGE 2: Added hit.normal, hit.transform, and blob
+                    seamEvaluator.RegisterWeldTick(hit.point, hit.normal, hit.transform, blob, blobSpawnInterval);
+                }
             }
 
             yield return wait;

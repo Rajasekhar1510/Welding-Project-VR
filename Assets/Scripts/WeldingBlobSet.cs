@@ -1,4 +1,3 @@
-using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(MeshRenderer), typeof(MeshFilter))]
@@ -13,7 +12,7 @@ public class WeldingBlobSet : MonoBehaviour
 
     private MeshRenderer meshRenderer;
     private MeshFilter meshFilter;
-    private Coroutine coolingRoutine;
+    private bool coolingStarted = false;
 
     private void Awake()
     {
@@ -21,38 +20,54 @@ public class WeldingBlobSet : MonoBehaviour
         meshFilter = GetComponent<MeshFilter>();
     }
 
-    public void ShowGlow()
+    private void Start()
     {
-        if (coolingRoutine != null) StopCoroutine(coolingRoutine);
-        coolingRoutine = StartCoroutine(CoolingSequence());
+        if (!coolingStarted)
+        {
+            ShowGlow();
+        }
     }
 
-    private IEnumerator CoolingSequence()
+    public void ShowGlow()
     {
-        // 1. Start glowing hot
-        Material runtimeHotMat = new Material(blobHotMaterial);
-        meshRenderer.material = runtimeHotMat;
-        Color initialColor = runtimeHotMat.color;
+        coolingStarted = true;
 
-        yield return new WaitForSeconds(coolingDelay);
+        // Cancel any previous tweens on this blob just in case
+        LeanTween.cancel(gameObject);
 
-        // 2. Gradually cool down color and emission
-        float elapsed = 0f;
-        while (elapsed < coolingFade)
+        if (blobHotMaterial != null)
         {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / coolingFade);
-
-            runtimeHotMat.color = Color.Lerp(initialColor, fadeToCool, t);
-            runtimeHotMat.SetColor("_EmissionColor", new Color(1f - t, 1f - t, 0f, 1f - t));
-
-            yield return null;
+            meshRenderer.material = blobHotMaterial;
         }
 
-        // 3. Swap to final cooled material and flattened bead mesh
-        if (blobCooledMaterial != null) meshRenderer.material = blobCooledMaterial;
-        if (flatBlobMesh != null) meshFilter.mesh = flatBlobMesh;
+        // 1. Wait for coolingDelay before starting the fade
+        LeanTween.value(gameObject, 0f, 1f, coolingDelay).setOnComplete(() =>
+        {
+            Material newMaterial = Instantiate(blobHotMaterial);
+            meshRenderer.material = newMaterial;
 
-        Destroy(runtimeHotMat);
+            // 2. Fade color and emission from glowing hot to cool grey
+            LeanTween.value(gameObject, 0f, 1f, coolingFade).setOnUpdate((float val) =>
+            {
+                newMaterial.color = Color.Lerp(newMaterial.color, fadeToCool, val);
+                newMaterial.SetColor("_EmissionColor", new Color(1f - val, 1f - val, 0f, 1f - val));
+            })
+            .setOnComplete(() =>
+            {
+                // 3. Swap to cooled material and flattened mesh
+                if (blobCooledMaterial != null)
+                    meshRenderer.material = blobCooledMaterial;
+
+                if (flatBlobMesh != null)
+                    meshFilter.mesh = flatBlobMesh;
+
+                Destroy(newMaterial);
+            });
+        });
+    }
+
+    private void OnDestroy()
+    {
+        LeanTween.cancel(gameObject);
     }
 }

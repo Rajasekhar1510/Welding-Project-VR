@@ -31,6 +31,7 @@ TagManager:
   - SamplesInfoPanel
   - QDSUIToggleCheckboxRadio
   - QDSUIToggleThumbnail
+  - WeldHole
   layers:
   - Default
   - TransparentFX
@@ -39,8 +40,8 @@ TagManager:
   - Water
   - UI
   - Weldable
-  - 
-  - 
+  - WeldingMask
+  - Effects
   - 
   - 
   - 

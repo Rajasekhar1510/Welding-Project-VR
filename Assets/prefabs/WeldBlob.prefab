@@ -106,6 +106,6 @@ MonoBehaviour:
   blobHotMaterial: {fileID: 2100000, guid: ca8d638b68371d248bd047bcd8cb5bde, type: 2}
   blobCooledMaterial: {fileID: 2100000, guid: dd50266d3da2b664eb1990349e3d225a, type: 2}
   flatBlobMesh: {fileID: -5872129705350155954, guid: 29d0b975f35ac054997d1f6f180380a0, type: 3}
-  coolingDelay: 1
-  coolingFade: 2
+  coolingDelay: 3
+  coolingFade: 4
   fadeToCool: {r: 0.5, g: 0.5, b: 0.5, a: 1}
